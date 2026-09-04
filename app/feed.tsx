@@ -8,10 +8,18 @@ import type {Listing} from '@/lib/feed-parser';
 import type {DirectListing,SourceState} from '@/lib/direct-feed';
 import {Tabs,TabsList,TabsTrigger} from '@/components/ui/tabs';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
+
+// 서버가 붙은 주소에서는 /api/feed가, 정적 배포에서는 함께 올라간 파일이 응답한다.
+async function loadFeed(signal:AbortSignal){
+ const api=await fetch('/api/feed',{signal,cache:'no-cache'}).catch(()=>null);
+ if(api&&api.ok)return api;
+ return fetch(import.meta.env.BASE_URL+'data/feed.json',{signal,cache:'no-cache'});
+}
+
 type Data={items:DirectListing[];total:number;sources:SourceState[];counts:Record<string,number>;updatedAt:string};
 export default function Feed({onSave,saved,applied}:{onSave:(r:Listing,status:string)=>Promise<boolean|void>;saved:string[];applied:string[]}){
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[kind,setKind]=useState('delivery'),[category,setCategory]=useState('style'),[source,setSource]=useState('29CM'),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[sort,setSort]=useState('deadline'),[reload,setReload]=useState(0),[limit,setLimit]=useState(18);
- useEffect(()=>{const c=new AbortController();setLoading(true);setError('');setLimit(18);fetch(import.meta.env.BASE_URL+'data/feed.json',{signal:c.signal,cache:'no-cache'}).then(async r=>{if(!r.ok)throw Error('공고를 불러오지 못했어요.');setData(filterFeed(await r.json(),new URLSearchParams({kind,category,source,search,sort})))}).catch(e=>{if(e.name!=='AbortError')setError(e.message)}).finally(()=>{if(!c.signal.aborted)setLoading(false)});return()=>c.abort()},[kind,category,source,search,sort,reload]);
+ useEffect(()=>{const c=new AbortController();setLoading(true);setError('');setLimit(18);loadFeed(c.signal).then(async r=>{if(!r.ok)throw Error('공고를 불러오지 못했어요.');setData(filterFeed(await r.json(),new URLSearchParams({kind,category,source,search,sort})))}).catch(e=>{if(e.name!=='AbortError')setError(e.message)}).finally(()=>{if(!c.signal.aborted)setLoading(false)});return()=>c.abort()},[kind,category,source,search,sort,reload]);
  const isApplied=(url:string)=>applied.includes(url);
  const connected=data?.sources.filter(s=>s.status==='ok')||[];
  return <section className="feed"><div className="catalog-heading"><div><span className="catalog-kicker">FOR YOUR NEXT REVIEW</span><h1>취향에 맞는 제품 체험<span>.</span></h1><p>뷰티와 패션부터 골라보세요. 전국 배송형을 먼저 보여드려요. 29CM 체험단부터 모아뒀어요.</p></div><div className="catalog-scope"><span><MapPin size={15}/> 서울 방문</span><span><Package size={15}/> 전국 배송</span></div></div>
