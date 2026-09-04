@@ -1,19 +1,15 @@
 import {classify} from './categories';
 import type {DirectListing} from './direct-feed';
 
-// Read the public page's serialized data, without executing scripts.
-export function twentynine(html:string):DirectListing[]{
- const flight=[...html.matchAll(/self\.__next_f\.push\((\[[\s\S]*?\])\)<\/script>/g)].map(m=>{try{return JSON.parse(m[1])[1]||''}catch{return ''}}).join('');
- let events:Record<string,unknown>[]|undefined;
- function visit(value:unknown):void{
-  if(!value||typeof value!=='object')return;
-  const node=value as Record<string,any>;
-  if(node.eventList?.success&&Array.isArray(node.eventList.data?.list))events=node.eventList.data.list;
-  for(const child of Object.values(node))visit(child);
- }
- for(const line of flight.split('\n')){try{visit(JSON.parse(line.slice(line.indexOf(':')+1)))}catch{}}
- if(!events)throw Error('29CM 목록 형식 확인 필요');
- return events.flatMap(x=>{
+// 29CM's own preuser list endpoint. Public, no authentication, newest first.
+// The list mixes closed events in after the open ones, so we drop anything past its deadline.
+type Event={preuserEventKey?:unknown;itemName?:unknown;recruitEndAt?:unknown;applicantCount?:unknown;totalWinnerLimit?:unknown;imageUrl?:unknown;frontBrandNameKor?:unknown;frontBrandNameEng?:unknown};
+
+export function twentynine(body:string):DirectListing[]{
+ let list:unknown;
+ try{list=JSON.parse(body)?.data?.list}catch{throw Error('29CM 목록 형식 확인 필요')}
+ if(!Array.isArray(list))throw Error('29CM 목록 형식 확인 필요');
+ return (list as Event[]).flatMap(x=>{
   const endAt=String(x.recruitEndAt||''),end=Date.parse(endAt);
   if(!Number.isFinite(end)||end<=Date.now()||typeof x.itemName!=='string'||!/^PE_[A-Za-z0-9]+$/.test(String(x.preuserEventKey)))return [];
   const url='https://www.29cm.co.kr/preuser/event/'+x.preuserEventKey;
