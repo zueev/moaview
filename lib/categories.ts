@@ -1,0 +1,12 @@
+export const categoryOptions=[['style','뷰티·패션 먼저'],['beauty','뷰티'],['fashion','패션·의류'],['food','식품'],['living','리빙'],['other','기타'],['all','전체']] as const;
+export type Category='beauty'|'fashion'|'food'|'living'|'other';
+export const categoryLabel:Record<Category,string>={beauty:'뷰티',fashion:'패션·의류',food:'식품',living:'리빙',other:'기타'};
+export function classify(title:string,benefit:string):Category{
+ const s=(title+' '+benefit).replaceAll('_',' ');
+ if(/강아지|고양이|반려|펫요거트|애견/.test(s))return 'other';
+ if(/샴푸|트리트먼트|헤어브러|헤어팩|화장품|기초화장|스킨케어|아이크림|넥크림|선크림|선로션|세럼|앰플|토너|미스트|클렌징|클렌저|마스크팩|PDRN|립베이스|립스틱|립틴트|쿠션팩트|파운데이션|메이크업|바디로션|바디워시|에센스|향수|탈모|미용실|피부관리|에스테틱|네일|염색|두피|스케일링|왁싱/i.test(s))return 'beauty';
+ if(/코트|네트백|\b(ring|necklace|bag|sweatpants|shirt|jacket|dress|cardigan)\b|의류|티셔츠|셔츠|블라우스|원피스|니트|가디건|팬츠|청바지|스커트|재킷|자켓|후드|맨투맨|잠옷|란제리|언더웨어|속옷|브라렛|가운 세트|레깅스|양말|스니커즈|운동화|구두|샌들|슬리퍼|핸드백|숄더백|크로스백|이너백|에코백|백팩|선글라스|목걸이|귀걸이|팔찌|주얼리|악세서리|모자|볼캡|비니|머플러|패션/i.test(s))return 'fashion';
+ if(/크림치즈|식사권|음식|고기|한우|돼지|설렁탕|도가니|고등어|김치|과일|고구마|약과|떡집|떡볶이|간장게장|전복|커피|도시락|샐러드|샌드위치|쿠키|디저트|콩포트|\b잼\b|수제 잼|감자빵|크런치|식품|음료|밀키트|낙산균|유산균|이노시톨|다이어트환|다이어트한약|체지방|영양제|식당|레스토랑|스시|오마카세|카페/.test(s))return 'food';
+ if(/북커버|머그|수면안대|이불|침구|침대|매트리스|토퍼|베개|수건|타월|세탁|세제|섬유유연제|주방|식기|컵|텀블러|정리함|수납|파우치|청소|샤워기|가구|인테리어|조명|방향제|디퓨저|욕실|행주|도마|가전|스피커|노트북|이어폰/.test(s))return 'living';
+ return 'other';
+}

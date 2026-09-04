@@ -1,0 +1,12 @@
+export type Listing={id:string;title:string;platform:string;channel:string;url:string;deadline:string;applicants:number|null;recruits:number|null;name:string;region:string;benefit:string;conditions:string};
+function clean(s:string){return s.replace(/<[^>]*>/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ').replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Math.min(1114111,Number(n)))).replace(/\s+/g,' ').trim();}
+export function summarizeListing(title:string,conditions:string){
+ const tags=[...title.matchAll(/\[([^\]]+)\]/g)].map(m=>m[1]);
+ const region=tags.find(t=>/^(서울|경기|인천|부산|대구|대전|광주|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주|충청|전라|경상|전국)/.test(t))?.replaceAll('/',' ')||'';
+ const rest=title.replace(/^(?:\s*\[[^\]]+\])+\s*/,'').trim();
+ const split=rest.match(/^(.+?)\s*[（(]([\s\S]*)[)）]\s*$/);
+ return {name:split?.[1]?.trim()||rest||title,region,benefit:split?.[2]?.trim()||'',conditions};
+}
+export function parseFeed(html:string){const filtered=html.match(/class="result-count-filtered"[^>]*>([\s\S]*?)<\/span>/);if(!filtered)throw new Error('공고 출처의 형식이 변경되어 불러올 수 없습니다.');const total=Number(clean(filtered[1]).replace(/[^0-9]/g,''));const allTotal=Number(clean(html.match(/class="result-count-total"[^>]*>([\s\S]*?)<\/span>/)?.[1]||'0').replace(/[^0-9]/g,''));const items:Listing[]=[];
+for(const part of html.split(/<div class="campaign-card"[^>]*>/).slice(1)){const a=part.match(/<a class="campaign-title"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);if(!a)continue;const url=clean(a[1]);if(!/^https?:\/\//.test(url))continue;const counts=part.match(/신청\s*(\d+)\s*\/\s*모집\s*(\d+)/);const title=clean(a[2]);const conditions=clean(part.match(/class="card-meta possible-days-times"[^>]*>([\s\S]*?)<\/span>/)?.[1]||'');items.push({...summarizeListing(title,conditions),id:part.match(/data-campaign-id="([^"]+)"/)?.[1]||url,title:clean(a[2]),url,platform:clean(part.match(/class="platform-mini[^\"]*"[^>]*>([\s\S]*?)<\/span>/)?.[1]||'기타'),channel:clean(part.match(/class="sns-chip[^\"]*"[^>]*>([\s\S]*?)<\/span>/)?.[1]||'기타'),deadline:clean(part.match(/class="deadline-badge"[^>]*>([\s\S]*?)<\/span>/)?.[1]||'원문 확인'),applicants:counts?Number(counts[1]):null,recruits:counts?Number(counts[2]):null});}
+if(total>0&&!items.length)throw new Error('공고를 읽지 못했습니다. 잠시 후 다시 시도해 주세요.');return {items,total,allTotal};}
