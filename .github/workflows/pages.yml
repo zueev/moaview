@@ -11,9 +11,10 @@ permissions:
   id-token: write
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   build:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +22,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund --loglevel=info --fetch-timeout=30000 --fetch-retries=1
       - run: npm run collect
       - run: npm run build
       - uses: actions/configure-pages@v5
