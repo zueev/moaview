@@ -2,7 +2,7 @@
 import {useEffect,useState} from 'react';
 import Feed from './feed';
 import type {Listing} from '@/lib/feed-parser';
-import {Plus,ArrowUpRight,Check,Inbox,CalendarDays,LayoutGrid,LockKeyhole,CheckCheck,ArrowRight,Link2,ClipboardList,Package,MapPin,Search} from 'lucide-react';
+import {Plus,Link,ArrowUpRight,Check,Inbox,CalendarDays,LayoutGrid,LockKeyhole,CheckCheck,ArrowRight,Link2,ClipboardList,Package,MapPin,Search} from 'lucide-react';
 import {Tabs,TabsList,TabsTrigger,TabsContent} from '@/components/ui/tabs';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {Select,SelectTrigger,SelectValue,SelectContent,SelectItem} from '@/components/ui/select';
@@ -10,10 +10,11 @@ import {Checkbox} from '@/components/ui/checkbox';
 import {Empty,EmptyHeader,EmptyTitle,EmptyDescription} from '@/components/ui/empty';
 import {Campaign,statuses,platforms,dueLabel} from '@/lib/model';
 import {listCampaigns,saveCampaign,toggleTask} from './actions';
+import Connect29CM from './connect-29cm';
 const blank=():Campaign=>({id:'',title:'',platform:'레뷰',url:'',kind:'배송형',status:'관심',due:'',notes:'',tasks:[],created:''});
 function Choice({value,values,onChange,label}:{value:string;values:string[];onChange:(v:string)=>void;label:string}){return <Select value={value} onValueChange={v=>v&&onChange(v)}><SelectTrigger aria-label={label} className="choice"><SelectValue/></SelectTrigger><SelectContent>{values.map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>}
 export default function Desk(){
- const [records,setRecords]=useState<Campaign[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState(''),[tab,setTab]=useState('discover'),[filter,setFilter]=useState('전체'),[search,setSearch]=useState(''),[draft,setDraft]=useState<Campaign|null>(null),[busy,setBusy]=useState(false),[formError,setFormError]=useState('');
+ const [records,setRecords]=useState<Campaign[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState(''),[tab,setTab]=useState('discover'),[filter,setFilter]=useState('전체'),[search,setSearch]=useState(''),[draft,setDraft]=useState<Campaign|null>(null),[busy,setBusy]=useState(false),[formError,setFormError]=useState(''),[connecting,setConnecting]=useState(false);
  async function refresh(){try{setRecords(await listCampaigns());setError('');}catch(e){setError(e instanceof Error?e.message:'저장된 내용을 불러오지 못했습니다.');}finally{setLoading(false);}}
  useEffect(()=>{refresh()},[]);
  const won=records.filter(r=>r.status==='당첨'),applied=records.filter(r=>r.status==='신청 완료'),done=records.filter(r=>r.status==='완료');
@@ -25,7 +26,7 @@ export default function Desk(){
  async function tick(r:Campaign,id:string,checked:boolean){if(busy)return;setBusy(true);try{await toggleTask(r.id,id,checked);await refresh();setNotice(checked?'할 일을 완료했어요.':'완료 표시를 취소했어요.')}catch(e){setError(e instanceof Error?e.message:'변경에 실패했습니다.')}finally{setBusy(false)}}
  async function finish(r:Campaign){if(busy)return;setBusy(true);try{await saveCampaign({...r,status:'완료'});await refresh();setNotice('체험단을 완료했어요. 수고하셨습니다!')}catch(e){setError(e instanceof Error?e.message:'변경에 실패했습니다.')}finally{setBusy(false)}}
  async function collect(r:Listing,status:string){if(busy)return false;const existing=records.find(v=>v.url===r.url);if(existing&&status!=='신청 완료'){setNotice('이미 내 신청함에 저장되어 있어요.');return true;}setBusy(true);try{if(existing){if(existing.status==='관심')await saveCampaign({...existing,status});}else await saveCampaign({...blank(),title:r.title.slice(0,150),platform:platforms.includes(r.platform)?r.platform:'기타',url:r.url,kind:('kind' in r?String(r.kind):r.title.includes('배송')?'배송형':'기타'),status,notes:'공고 출처: '+r.platform+' · '+r.channel+'\n모집 마감 안내: '+r.deadline+'\n리뷰 마감일은 당첨 후 원문에서 확인해 주세요.'});await refresh();setNotice(status==='관심'?'관심 체험단으로 담았어요.':'신청 완료로 기록했어요.');return true;}catch(e){setError(e instanceof Error?e.message:'저장에 실패했습니다.');return false;}finally{setBusy(false)}}
- return <main className={"shell "+(tab==='discover'?'discovery-shell':'')}><header className="top"><a className="logo" href="./">moaview<span>모아뷰</span></a><span className="private"><LockKeyhole size={14}/> 이 기기의 체험 보관함</span></header>
+ return <main className={"shell "+(tab==='discover'?'discovery-shell':'')}><header className="top"><a className="logo" href="./">moaview<span>모아뷰</span></a><div className="top-right"><button className="link-29cm" onClick={()=>setConnecting(true)}><Link size={14}/> 29CM 연결</button><span className="private"><LockKeyhole size={14}/> 나의 체험 보관함</span></div></header>{connecting&&<Connect29CM onClose={()=>setConnecting(false)} onDone={refresh}/>}
  {tab!=='discover'&&<><section className="intro intro-row"><div><p className="eyebrow">MY REVIEW DESK</p><h1>새로운 체험을 발견하는 곳.</h1><p>흩어진 체험단을 둘러보고, 신청부터 리뷰까지 한곳에서.</p></div><button className="outline add" onClick={()=>setTab("tasks")}><ClipboardList size={17}/> 나의 할 일 <span className="tab-count">{count}</span></button></section>
  <section className="stats" aria-label="체험단 현황">{[[Inbox,'신청 후 기다리는 중',applied.length,'건'],[CheckCheck,'당첨된 체험단',won.length,'건'],[ClipboardList,'남은 할 일',count,'개'],[Check,'리뷰까지 완료',done.length,'건']].map(([Icon,label,n,unit]:any,i)=><div key={label} className={'stat stat-'+i}><span className="stat-label"><Icon size={17}/>{label}</span><div><strong>{loading?'—':n}</strong><span>{unit}</span></div></div>)}</section></>}
  {error&&<div className="message error" role="alert">{error}<button onClick={()=>{setLoading(true);refresh()}}>다시 불러오기</button></div>}

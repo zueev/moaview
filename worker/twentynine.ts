@@ -35,7 +35,17 @@ async function applications(cookie:string){
  return {status:r.status,body,...merge(cookie,r)};
 }
 
-export async function sync(db:D1Database,seed?:string):Promise<Result> {
+export async function sync(db:D1Database,seed?:string):Promise<Result>{
+ const result=await run(db,seed);
+ await memo.set(db,'29cm:last',JSON.stringify({...result,at:new Date().toISOString()}));
+ return result;
+}
+
+export async function state(db:D1Database){
+ return {connected:!!await memo.get(db,COOKIE),last:JSON.parse(await memo.get(db,'29cm:last')||'null'),shape:await memo.get(db,'29cm:shape')};
+}
+
+async function run(db:D1Database,seed?:string):Promise<Result> {
  let cookie=await memo.get(db,COOKIE)||seed||'';
  if(!cookie)return {ok:false,status:0,refreshed:false,found:0,added:0,updated:0,message:'29CM 연결 정보가 아직 없습니다.'};
 

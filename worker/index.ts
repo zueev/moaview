@@ -1,6 +1,7 @@
 import {valid,token,cookie,matches} from './auth';
-import {list,save,toggle,remove,memo} from './records';
-import {sync} from './twentynine';
+import {list,save,toggle,remove} from './records';
+import {attempts,record,clear} from './throttle';
+import {sync,state} from './twentynine';
 
 type Env={DB:D1Database;ASSETS:Fetcher;MOAVIEW_PASSPHRASE:string;SESSION_SECRET:string};
 
@@ -16,8 +17,12 @@ async function api(request:Request,env:Env,path:string):Promise<Response>{
  }
  if(path==='/api/login'&&request.method==='POST'){
   if(!env.MOAVIEW_PASSPHRASE)return fail('아직 암구호가 설정되지 않았어요.',503);
+  const who='login:'+(request.headers.get('CF-Connecting-IP')||'unknown');
+  const tries=await attempts(env.DB,who);
+  if(tries>=8)return fail('시도가 너무 많아요. 10분 후에 다시 해주세요.',429);
   const body=await request.json().catch(()=>({})) as {passphrase?:unknown};
-  if(!matches(body.passphrase,env.MOAVIEW_PASSPHRASE))return fail('암구호가 맞지 않아요.',401);
+  if(!matches(body.passphrase,env.MOAVIEW_PASSPHRASE)){await record(env.DB,who,tries+1);return fail('암구호가 맞지 않아요.',401)}
+  await clear(env.DB,who);
   return new Response(JSON.stringify({ok:true}),{headers:{'Content-Type':'application/json','Set-Cookie':cookie(await token(env.SESSION_SECRET))}});
  }
 
@@ -52,7 +57,7 @@ async function api(request:Request,env:Env,path:string):Promise<Response>{
   return json(await sync(env.DB,body.cookie));
  }
  if(path==='/api/29cm/sync'&&request.method==='POST')return json(await sync(env.DB));
- if(path==='/api/29cm/shape')return json({shape:await memo.get(env.DB,'29cm:shape')});
+ if(path==='/api/29cm/state')return json(await state(env.DB));
 
  return fail('없는 주소입니다.',404);
 }

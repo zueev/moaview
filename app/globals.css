@@ -269,3 +269,19 @@ body{font-family:'Pretendard','Malgun Gothic',Arial,sans-serif;background:#fafaf
 .gate-error{color:#c0392b;font-size:.82rem}
 .gate-moved{margin:0;padding:.6rem 1rem;background:#eef6ff;font-size:.85rem;text-align:center}
 .gate-link{display:block;width:100%;padding:.7rem;border-radius:.6rem;background:#111;color:#fff;font-weight:600;text-decoration:none}
+
+.top-right{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+.link-29cm{display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .6rem;border:1px solid rgba(0,0,0,.15);border-radius:999px;background:transparent;font-size:.78rem;cursor:pointer}
+.connect-29cm{display:grid;gap:.75rem;max-width:32rem}
+.connect-steps{font-size:.83rem;line-height:1.6}
+.connect-steps ol{margin:.5rem 0 .5rem 1.1rem;display:grid;gap:.3rem}
+.connect-steps p{opacity:.7;margin:.4rem 0 0}
+.connect-input{width:100%;padding:.6rem;border:1px solid rgba(0,0,0,.15);border-radius:.5rem;font-family:ui-monospace,monospace;font-size:.75rem;resize:vertical}
+.connect-actions{display:flex;gap:.5rem}
+.connect-actions button{flex:1;padding:.6rem;border-radius:.5rem;font-weight:600;cursor:pointer;border:1px solid transparent}
+.connect-actions .primary{background:#111;color:#fff}
+.connect-actions .outline{background:transparent;border-color:rgba(0,0,0,.2)}
+.connect-actions button:disabled{opacity:.45;cursor:default}
+.connect-last{font-size:.8rem;opacity:.75;margin:0}
+.connect-ok{font-size:.83rem;color:#1a7f4b;margin:0}
+.connect-error{font-size:.83rem;color:#c0392b;margin:0}
