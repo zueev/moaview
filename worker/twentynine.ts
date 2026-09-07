@@ -78,22 +78,25 @@ async function run(db:D1Database,seed?:string):Promise<Result> {
   await memo.set(db,'29cm:shape',JSON.stringify(list[0]));
  if(!Array.isArray(list))return {ok:false,status:200,refreshed,found:0,added:0,updated:0,message:'29CM 응답 형태를 알 수 없어요.'};
 
- let added=0,updated=0;
+ let added=0,updated=0,skipped=0,seen=0,firstError='';
  for(const item of list){
   const key=String(item.preuserEventKey||'');
-  if(!/^PE_[A-Za-z0-9]+$/.test(key))continue;
+  if(!/^PE_[A-Za-z0-9]+$/.test(key)){skipped++;continue}
   const url='https://www.29cm.co.kr/preuser/event/'+key;
   const status=readStatus(String(item.applicationStatus||''));
   const due=deadline(item.reviewWriteEndAt);
   const existing=await db.prepare('SELECT id,status,due,tasks FROM campaigns WHERE url=?').bind(url).first<{id:string;status:string;due:string;tasks:string}>();
   const now=new Date().toISOString();
   if(!existing){
-   await db.prepare(`INSERT INTO campaigns (id,title,platform,url,kind,status,due,notes,tasks,source,created,updated)
-     VALUES (?,?,'29CM',?,'배송형',?,?,'',?,'29cm',?,?)`)
-    .bind(crypto.randomUUID(),String(item.itemName||'29CM 체험단'),url,status,due,JSON.stringify(status==='당첨'?checklist('배송형'):[]),now,now).run();
-   added++;
+   try{
+    await db.prepare(`INSERT INTO campaigns (id,title,platform,url,kind,status,due,notes,tasks,source,created,updated)
+      VALUES (?,?,'29CM',?,'배송형',?,?,'',?,'29cm',?,?)`)
+     .bind(crypto.randomUUID(),String(item.itemName||'29CM 체험단'),url,status,due,JSON.stringify(status==='당첨'?checklist('배송형'):[]),now,now).run();
+    added++;
+   }catch(e){if(!firstError)firstError=(e as Error).message.slice(0,160)}
    continue;
   }
+  seen++;
   // 손으로 완료한 것은 건드리지 않는다.
   if(existing.status==='완료')continue;
   const tasks=JSON.parse(existing.tasks) as ReturnType<typeof checklist>;
@@ -103,7 +106,7 @@ async function run(db:D1Database,seed?:string):Promise<Result> {
    .bind(status,due||existing.due,JSON.stringify(next),now,existing.id).run();
   updated++;
  }
- return {ok:true,status:200,refreshed,found:list.length,added,updated};
+ return {ok:true,status:200,refreshed,found:list.length,added,updated,detail:`건너뜀 ${skipped} · 이미있음 ${seen} · 담기실패 ${list.length-skipped-seen-added}${firstError?' · '+firstError:''}`};
 }
 
 // 29CM이 쓰는 신청 상태 값. 지금까지 확인된 것은 APPLIED와 LOSE이고,
