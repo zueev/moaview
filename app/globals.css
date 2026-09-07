@@ -287,3 +287,11 @@ body{font-family:'Pretendard','Malgun Gothic',Arial,sans-serif;background:#fafaf
 .connect-error{font-size:.83rem;color:#c0392b;margin:0}
 .connect-field{display:grid;gap:.25rem;font-size:.8rem;font-weight:600}
 .connect-field span{font-weight:400;opacity:.65}
+
+.apply-filter{display:flex;gap:.4rem;margin:0 0 .6rem}
+.apply-filter button{padding:.35rem .75rem;border:1px solid rgba(0,0,0,.14);border-radius:999px;background:transparent;font-size:.82rem;cursor:pointer}
+.apply-filter button.on{background:#111;color:#fff;border-color:#111}
+.status-tabs{display:flex;gap:.4rem;flex-wrap:wrap;margin:0 0 .2rem}
+.status-tabs button{padding:.35rem .75rem;border:1px solid rgba(0,0,0,.14);border-radius:999px;background:transparent;font-size:.82rem;cursor:pointer}
+.status-tabs button.on{background:#111;color:#fff;border-color:#111}
+.status-tabs button b{font-weight:600;margin-left:.25rem;opacity:.75}
