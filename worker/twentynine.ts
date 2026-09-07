@@ -1,13 +1,16 @@
 import {memo,checklist} from './records';
 
-const AUTH='https://auth-api.29cm.co.kr/api/v1/auth/refresh';
+const AUTH='https://user-auth-api.29cm.co.kr/api/v1/auth/refresh';
 const API='https://preuser-api.29cm.co.kr/api/v4/preuser/events';
-const HEADERS={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0','Accept':'application/json','Referer':'https://www.29cm.co.kr/preuser'};
+const HEADERS={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0','Accept':'application/json','Referer':'https://www.29cm.co.kr/preuser','Origin':'https://www.29cm.co.kr'};
 const COOKIE='29cm:cookie';
 
-type Result={ok:boolean;status:number;refreshed:boolean;found:number;added:number;updated:number;message?:string};
+type Result={ok:boolean;status:number;refreshed:boolean;found:number;added:number;updated:number;message?:string;detail?:string};
 
-const jar=(cookie:string)=>({...HEADERS,Cookie:cookie});
+function jar(cookie:string){
+ const device=cookie.split(';').map(p=>p.trim()).find(p=>p.startsWith('x-device-id='))?.slice('x-device-id='.length);
+ return {...HEADERS,Cookie:cookie,...(device?{'x-device-id':device}:{})};
+}
 
 // Set-Cookie로 새 값이 오면 보관한 쿠키를 그 값으로 갈아끼운다.
 function merge(cookie:string,response:Response){
@@ -32,7 +35,7 @@ async function refresh(cookie:string){
 async function applications(cookie:string){
  const r=await fetch(API+'/my-applications?page=1&size=100',{headers:jar(cookie)});
  let body:any=null;try{body=await r.json()}catch{}
- return {status:r.status,body,...merge(cookie,r)};
+ return {status:r.status,body,code:String(body?.meta?.errorCode||''),note:String(body?.meta?.message||''),...merge(cookie,r)};
 }
 
 export async function sync(db:D1Database,seed?:string):Promise<Result>{
@@ -46,22 +49,28 @@ export async function state(db:D1Database){
 }
 
 async function run(db:D1Database,seed?:string):Promise<Result> {
- let cookie=await memo.get(db,COOKIE)||seed||'';
+ let cookie=seed||await memo.get(db,COOKIE)||'';
  if(!cookie)return {ok:false,status:0,refreshed:false,found:0,added:0,updated:0,message:'29CM 연결 정보가 아직 없습니다.'};
 
- let attempt=await applications(cookie);
  let refreshed=false;
+ if(!cookie.includes('access_token=')&&cookie.includes('refresh_token=')){
+  const first=await refresh(cookie);refreshed=true;
+  if(first.ok)cookie=first.cookie;
+ }
+ let attempt=await applications(cookie);
  if(attempt.status===401||attempt.status===403){
   const renewed=await refresh(cookie);
   refreshed=true;
-  if(!renewed.ok)return {ok:false,status:renewed.status,refreshed,found:0,added:0,updated:0,message:'29CM 로그인이 만료됐어요. 연결 정보를 다시 넣어 주세요.'};
+  if(!renewed.ok)return {ok:false,status:renewed.status,refreshed,found:0,added:0,updated:0,
+   message:cookie.includes('refresh_token=')?'29CM 로그인이 만료됐어요. 연결 정보를 다시 넣어 주세요.':'access_token이 거부됐어요. refresh_token도 함께 넣어 주세요.',
+   detail:`목록 ${attempt.status}${attempt.code?' '+attempt.code:''} · 갱신 ${renewed.status} · 보낸 쿠키 ${cookie.split(';').length}개`};
   cookie=renewed.cookie;
   attempt=await applications(cookie);
  }
  if(attempt.cookie!==cookie||attempt.changed)cookie=attempt.cookie;
  await memo.set(db,COOKIE,cookie);
 
- if(attempt.status!==200)return {ok:false,status:attempt.status,refreshed,found:0,added:0,updated:0,message:'29CM 신청내역을 불러오지 못했어요.'};
+ if(attempt.status!==200)return {ok:false,status:attempt.status,refreshed,found:0,added:0,updated:0,message:'29CM 신청내역을 불러오지 못했어요.',detail:`목록 ${attempt.status}${attempt.code?' '+attempt.code:''}${attempt.note?' · '+attempt.note:''}`};
 
  // 응답 형태를 처음 한 번 남겨 둔다. 매핑을 실제 데이터에 맞추기 위한 것.
  const list=attempt.body?.data?.list;

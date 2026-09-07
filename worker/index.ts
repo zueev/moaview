@@ -52,11 +52,13 @@ async function api(request:Request,env:Env,path:string):Promise<Response>{
  }
 
  if(path==='/api/29cm/connect'&&request.method==='POST'){
-  const body=await request.json().catch(()=>({})) as {cookie?:unknown;accessToken?:unknown;refreshToken?:unknown};
+  const body=await request.json().catch(()=>({})) as {cookie?:unknown;accessToken?:unknown;refreshToken?:unknown;deviceId?:unknown};
   const pairs:string[]=[];
   if(typeof body.cookie==='string'&&body.cookie.includes('='))pairs.push(body.cookie.trim());
   const add=(name:string,value:unknown)=>{if(typeof value==='string'&&value.trim())pairs.push(name+'='+value.trim())};
-  add('access_token',body.accessToken);add('refresh_token',body.refreshToken);
+  add('access_token',body.accessToken);add('refresh_token',body.refreshToken);add('x-device-id',body.deviceId);
+  if(!pairs.some(p=>p.startsWith('refresh_token=')))return fail('refresh_token이 있어야 연결이 유지돼요.');
+  if(!pairs.some(p=>p.startsWith('x-device-id=')))return fail('x-device-id 값도 함께 넣어 주세요.');
   const cookie=pairs.join('; ');
   if(cookie.length<20)return fail('29CM 연결 정보를 확인해 주세요.');
   return json(await sync(env.DB,cookie));
