@@ -52,9 +52,14 @@ async function api(request:Request,env:Env,path:string):Promise<Response>{
  }
 
  if(path==='/api/29cm/connect'&&request.method==='POST'){
-  const body=await request.json().catch(()=>({})) as {cookie?:unknown};
-  if(typeof body.cookie!=='string'||body.cookie.length<20)return fail('29CM 연결 정보를 확인해 주세요.');
-  return json(await sync(env.DB,body.cookie));
+  const body=await request.json().catch(()=>({})) as {cookie?:unknown;accessToken?:unknown;refreshToken?:unknown};
+  const pairs:string[]=[];
+  if(typeof body.cookie==='string'&&body.cookie.includes('='))pairs.push(body.cookie.trim());
+  const add=(name:string,value:unknown)=>{if(typeof value==='string'&&value.trim())pairs.push(name+'='+value.trim())};
+  add('access_token',body.accessToken);add('refresh_token',body.refreshToken);
+  const cookie=pairs.join('; ');
+  if(cookie.length<20)return fail('29CM 연결 정보를 확인해 주세요.');
+  return json(await sync(env.DB,cookie));
  }
  if(path==='/api/29cm/sync'&&request.method==='POST')return json(await sync(env.DB));
  if(path==='/api/29cm/state')return json(await state(env.DB));

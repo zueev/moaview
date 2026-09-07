@@ -285,3 +285,5 @@ body{font-family:'Pretendard','Malgun Gothic',Arial,sans-serif;background:#fafaf
 .connect-last{font-size:.8rem;opacity:.75;margin:0}
 .connect-ok{font-size:.83rem;color:#1a7f4b;margin:0}
 .connect-error{font-size:.83rem;color:#c0392b;margin:0}
+.connect-field{display:grid;gap:.25rem;font-size:.8rem;font-weight:600}
+.connect-field span{font-weight:400;opacity:.65}

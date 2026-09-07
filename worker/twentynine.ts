@@ -74,22 +74,37 @@ async function run(db:D1Database,seed?:string):Promise<Result> {
   const key=String(item.preuserEventKey||'');
   if(!/^PE_[A-Za-z0-9]+$/.test(key))continue;
   const url='https://www.29cm.co.kr/preuser/event/'+key;
-  const won=/WIN|SELECT|당첨|선정/i.test(String(item.applicantStatus??item.status??item.winningStatus??''));
-  const status=won?'당첨':'신청 완료';
-  const existing=await db.prepare('SELECT id,status,tasks FROM campaigns WHERE url=?').bind(url).first<{id:string;status:string;tasks:string}>();
+  const status=readStatus(String(item.applicationStatus||''));
+  const due=deadline(item.reviewWriteEndAt);
+  const existing=await db.prepare('SELECT id,status,due,tasks FROM campaigns WHERE url=?').bind(url).first<{id:string;status:string;due:string;tasks:string}>();
   const now=new Date().toISOString();
   if(!existing){
-   const tasks=won?checklist('배송형'):[];
    await db.prepare(`INSERT INTO campaigns (id,title,platform,url,kind,status,due,notes,tasks,source,created,updated)
-     VALUES (?,?,'29CM',?,'배송형',?,'','',?,'29cm',?,?)`)
-    .bind(crypto.randomUUID(),String(item.itemName||'29CM 체험단'),url,status,JSON.stringify(tasks),now,now).run();
+     VALUES (?,?,'29CM',?,'배송형',?,?,'',?,'29cm',?,?)`)
+    .bind(crypto.randomUUID(),String(item.itemName||'29CM 체험단'),url,status,due,JSON.stringify(status==='당첨'?checklist('배송형'):[]),now,now).run();
    added++;
-  }else if(won&&existing.status!=='당첨'&&existing.status!=='완료'){
-   const tasks=JSON.parse(existing.tasks);
-   await db.prepare('UPDATE campaigns SET status=?,tasks=?,updated=? WHERE id=?')
-    .bind('당첨',JSON.stringify(tasks.length?tasks:checklist('배송형')),now,existing.id).run();
-   updated++;
+   continue;
   }
+  // 손으로 완료한 것은 건드리지 않는다.
+  if(existing.status==='완료')continue;
+  const tasks=JSON.parse(existing.tasks) as ReturnType<typeof checklist>;
+  const next=status==='당첨'&&!tasks.length?checklist('배송형'):tasks;
+  if(existing.status===status&&existing.due===due&&next===tasks)continue;
+  await db.prepare('UPDATE campaigns SET status=?,due=?,tasks=?,updated=? WHERE id=?')
+   .bind(status,due||existing.due,JSON.stringify(next),now,existing.id).run();
+  updated++;
  }
  return {ok:true,status:200,refreshed,found:list.length,added,updated};
+}
+
+// 29CM이 쓰는 신청 상태 값. 지금까지 확인된 것은 APPLIED와 LOSE이고,
+// 당첨 값은 아직 못 봐서 흔한 표기를 함께 받아 둔다.
+function readStatus(value:string){
+ if(/WIN|SELECT|CHOSEN|당첨|선정/i.test(value))return '당첨';
+ if(/LOSE|LOST|FAIL|REJECT|미선정|탈락/i.test(value))return '미선정';
+ return '신청 완료';
+}
+function deadline(value:unknown){
+ const at=Date.parse(String(value||''));
+ return Number.isFinite(at)?new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(at):'';
 }

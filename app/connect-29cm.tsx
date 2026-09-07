@@ -14,7 +14,7 @@ async function api(path:string,init?:RequestInit){
 
 export default function Connect29CM({onClose,onDone}:{onClose:()=>void;onDone:()=>void}){
  const [state,setState]=useState<State>();
- const [cookie,setCookie]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[result,setResult]=useState<Result>();
+ const [access,setAccess]=useState(''),[refresh,setRefresh]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[result,setResult]=useState<Result>();
 
  async function load(){try{setState(await api('/state') as State)}catch(e){setError(e instanceof Error?e.message:'상태를 읽지 못했어요.')}}
  useEffect(()=>{void load()},[]);
@@ -24,7 +24,7 @@ export default function Connect29CM({onClose,onDone}:{onClose:()=>void;onDone:()
   try{
    const r=await api(path,{method:'POST',body:JSON.stringify(body||{})}) as Result;
    setResult(r);
-   if(r.ok){setCookie('');onDone()}
+   if(r.ok){setAccess('');setRefresh('');onDone()}
    await load();
   }catch(e){setError(e instanceof Error?e.message:'연결에 실패했어요.')}
   finally{setBusy(false)}
@@ -43,16 +43,21 @@ export default function Connect29CM({onClose,onDone}:{onClose:()=>void;onDone:()
    <summary>연결하는 방법 (PC 크롬에서 한 번만)</summary>
    <ol>
     <li>크롬에서 <b>29cm.co.kr</b>에 로그인한 상태로 접속해요.</li>
-    <li><b>F12</b>를 눌러 개발자 도구를 열고 <b>Network</b> 탭으로 가요.</li>
-    <li>페이지를 <b>새로고침</b>하면 요청 목록이 채워져요.</li>
-    <li>아무 요청이나 클릭 → <b>Headers</b> → <b>Request Headers</b> 안의 <b>Cookie</b> 줄 값을 통째로 복사해요.</li>
-    <li>아래에 붙여넣고 연결을 눌러요.</li>
+    <li>페이지 빈 곳에 <b>우클릭 → 검사</b>를 눌러요. (F12가 안 되면 이렇게 열면 돼요)</li>
+    <li>위쪽 탭에서 <b>Application</b>을 골라요. 안 보이면 <b>≫</b>를 눌러 찾으세요.</li>
+    <li>왼쪽 목록에서 <b>Cookies → https://www.29cm.co.kr</b>을 눌러요.</li>
+    <li>이름이 <b>access_token</b>인 줄을 찾아 <b>Value</b> 칸을 더블클릭하고 전체 복사해 아래에 붙여넣어요.</li>
+    <li><b>refresh_token</b>도 같은 방법으로 복사해 두 번째 칸에 넣으면 연결이 오래 유지돼요.</li>
    </ol>
    <p>이 값은 서버에만 저장되고 화면에 다시 보이지 않아요. 로그인이 갱신되면 서버가 알아서 새 값으로 바꿔 둬요.</p>
-  </details>
+   </details>
 
-  <textarea className="connect-input" rows={4} value={cookie} onChange={e=>setCookie(e.target.value)}
-   placeholder="Cookie 값을 붙여넣으세요" aria-label="29CM Cookie 값" autoComplete="off" spellCheck={false}/>
+  <label className="connect-field">access_token
+   <textarea className="connect-input" rows={3} value={access} onChange={e=>setAccess(e.target.value)}
+    placeholder="access_token 값을 붙여넣으세요" aria-label="access_token" autoComplete="off" spellCheck={false}/></label>
+  <label className="connect-field">refresh_token <span>(선택 · 넣으면 오래 유지돼요)</span>
+   <textarea className="connect-input" rows={2} value={refresh} onChange={e=>setRefresh(e.target.value)}
+    placeholder="refresh_token 값" aria-label="refresh_token" autoComplete="off" spellCheck={false}/></label>
 
   {error&&<p className="connect-error" role="alert">{error}</p>}
   {result&&<p className={result.ok?'connect-ok':'connect-error'} role="status">
@@ -60,7 +65,7 @@ export default function Connect29CM({onClose,onDone}:{onClose:()=>void;onDone:()
   </p>}
 
   <div className="connect-actions">
-   <button className="primary" disabled={busy||cookie.trim().length<20} onClick={()=>run('/connect',{cookie:cookie.trim()})}>{busy?'확인 중…':'연결하기'}</button>
+   <button className="primary" disabled={busy||access.trim().length<20} onClick={()=>run('/connect',{accessToken:access,refreshToken:refresh})}>{busy?'확인 중…':'연결하기'}</button>
    {state?.connected&&<button className="outline" disabled={busy} onClick={()=>run('/sync')}>지금 가져오기</button>}
   </div>
  </DialogContent></Dialog>;
