@@ -15,6 +15,7 @@ async function api(request:Request,env:Env,path:string):Promise<Response>{
   return new Response(r.body,{status:r.status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=300'}});
  }
  if(path==='/api/login'&&request.method==='POST'){
+  if(!env.MOAVIEW_PASSPHRASE)return fail('아직 암구호가 설정되지 않았어요.',503);
   const body=await request.json().catch(()=>({})) as {passphrase?:unknown};
   if(!matches(body.passphrase,env.MOAVIEW_PASSPHRASE))return fail('암구호가 맞지 않아요.',401);
   return new Response(JSON.stringify({ok:true}),{headers:{'Content-Type':'application/json','Set-Cookie':cookie(await token(env.SESSION_SECRET))}});

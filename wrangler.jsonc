@@ -4,8 +4,8 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
-  "assets": { "directory": "./dist", "not_found_handling": "single-page-application" },
-  "d1_databases": [{ "binding": "DB", "database_name": "moaview", "database_id": "PLACEHOLDER" }],
+  "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application" },
+  "d1_databases": [{ "binding": "DB", "database_name": "moaview", "database_id": "97f13498-6a7b-4f4e-a0e8-1b42362031ec" }],
   "triggers": { "crons": ["23 * * * *"] },
   "observability": { "enabled": true }
 }

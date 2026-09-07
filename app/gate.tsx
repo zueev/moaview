@@ -4,7 +4,7 @@ import {LockKeyhole} from 'lucide-react';
 import {session,signIn,migrateLocal} from './actions';
 
 export default function Gate({children}:{children:React.ReactNode}){
- const [state,setState]=useState<'checking'|'locked'|'open'>('checking');
+ const [state,setState]=useState<'checking'|'locked'|'open'|'moved'>('checking');
  const [passphrase,setPassphrase]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[moved,setMoved]=useState(0);
 
  async function open(){
@@ -12,7 +12,7 @@ export default function Gate({children}:{children:React.ReactNode}){
   if(result?.moved)setMoved(result.moved);
   setState('open');
  }
- useEffect(()=>{void session().then(ok=>ok?open():setState('locked'))},[]);
+ useEffect(()=>{void session().then(r=>r==='open'?open():setState(r))},[]);
 
  async function submit(e:React.FormEvent){
   e.preventDefault();if(busy)return;
@@ -23,6 +23,7 @@ export default function Gate({children}:{children:React.ReactNode}){
  }
 
  if(state==='checking')return <div className="gate"><p>불러오는 중…</p></div>;
+ if(state==='moved')return <div className="gate"><div className="gate-form"><h1>모아뷰가 이사했어요</h1><p>기록이 기기 사이에서 이어지도록 서버가 있는 주소로 옮겼어요.</p><a className="gate-link" href="https://moaview.ziugaes.workers.dev">새 주소로 열기</a></div></div>;
  if(state==='locked')return <div className="gate">
   <form className="gate-form" onSubmit={submit}>
    <LockKeyhole size={28}/>

@@ -5,6 +5,8 @@ const LEGACY='moaview.campaigns.v1';
 async function call(path:string,init?:RequestInit){
  const r=await fetch('/api'+path,{...init,credentials:'same-origin',headers:{'Content-Type':'application/json',...init?.headers}});
  if(r.status===401)throw Object.assign(new Error('로그인이 필요합니다.'),{unauthorized:true});
+ // 서버가 없는 예전 정적 주소에서는 이 경로 자체가 없다.
+ if(r.status===404)throw Object.assign(new Error('이 주소에는 서버가 없어요.'),{missing:true});
  const body=await r.json().catch(()=>null);
  if(!r.ok)throw new Error((body as {error?:string})?.error||'요청을 처리하지 못했어요.');
  return body;
@@ -13,7 +15,11 @@ async function call(path:string,init?:RequestInit){
 export const unauthorized=(e:unknown)=>!!(e&&typeof e==='object'&&'unauthorized' in e);
 
 export async function signIn(passphrase:string){await call('/login',{method:'POST',body:JSON.stringify({passphrase})})}
-export async function session(){try{await call('/session');return true}catch{return false}}
+export const missingServer=(e:unknown)=>!!(e&&typeof e==='object'&&'missing' in e);
+export async function session():Promise<'open'|'locked'|'moved'>{
+ try{await call('/session');return 'open'}
+ catch(e){return missingServer(e)?'moved':'locked'}
+}
 
 export async function listCampaigns():Promise<Campaign[]>{return await call('/campaigns') as Campaign[]}
 export async function saveCampaign(input:Campaign):Promise<void>{await call('/campaigns',{method:'POST',body:JSON.stringify(input)})}

@@ -268,3 +268,4 @@ body{font-family:'Pretendard','Malgun Gothic',Arial,sans-serif;background:#fafaf
 .gate-form button:disabled{opacity:.45;cursor:default}
 .gate-error{color:#c0392b;font-size:.82rem}
 .gate-moved{margin:0;padding:.6rem 1rem;background:#eef6ff;font-size:.85rem;text-align:center}
+.gate-link{display:block;width:100%;padding:.7rem;border-radius:.6rem;background:#111;color:#fff;font-weight:600;text-decoration:none}
