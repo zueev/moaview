@@ -1,7 +1,8 @@
 import {valid,token,cookie,matches} from './auth';
 import {list,save,toggle,remove} from './records';
 import {attempts,record,clear} from './throttle';
-import {sync,state} from './twentynine';
+import {sync,state,call} from './twentynine';
+import {body as applyBody,summary,open as openForApply} from './apply';
 import {directFeed} from '../lib/direct-feed';
 import {memo} from './records';
 
@@ -97,6 +98,39 @@ async function api(request:Request,env:Env,path:string):Promise<Response>{
   try{return json(await collect(env.DB))}catch(e){return fail((e as Error).message.slice(0,200),502)}
  }
  if(path==='/api/29cm/state')return json(await state(env.DB));
+
+ // 배송지는 저장해두지 않는다. 신청할 때마다 화면에서 직접 넣는다.
+ const event=path.match(/^\/api\/29cm\/event\/(PE_[A-Za-z0-9]+)$/);
+ if(event&&request.method==='GET'){
+  try{
+   const r=await call(env.DB,'/'+event[1]);
+   if(r.status!==200||!r.json?.data)return fail('29CM 공고를 확인하지 못했어요.',502);
+   return json(summary(r.json.data));
+  }catch(e){return fail((e as Error).message,502)}
+ }
+
+ if(path==='/api/29cm/apply'&&request.method==='POST'){
+  const asked=await request.json().catch(()=>null) as any;
+  if(!asked||!/^PE_[A-Za-z0-9]+$/.test(String(asked.eventKey||'')))return fail('공고를 확인해 주세요.');
+  const url='https://www.29cm.co.kr/preuser/event/'+asked.eventKey;
+  const already=await env.DB.prepare('SELECT status FROM campaigns WHERE url=?').bind(url).first<{status:string}>();
+  if(already&&already.status!=='관심')return fail('이미 신청한 공고예요.',409);
+  try{
+   const detail=await call(env.DB,'/'+asked.eventKey);
+   if(detail.status!==200||!detail.json?.data)return fail('29CM 공고를 확인하지 못했어요.',502);
+   const d=detail.json.data;
+   if(d.isUserApplied)return fail('29CM에 이미 신청돼 있어요.',409);
+   openForApply(d);
+   const sent=await call(env.DB,'/'+asked.eventKey+'/apply','POST',applyBody(asked,d));
+   if(sent.status===200&&sent.json?.meta?.result==='SUCCESS'&&sent.json.data?.preuserEventApplicantKey){
+    await sync(env.DB);
+    return json({ok:true,name:String(d.itemName||'')});
+   }
+   if(sent.status>=400&&sent.status<500&&sent.json?.meta?.result==='FAIL')
+    return fail(String(sent.json.meta.message||'29CM에서 신청을 거절했어요.').slice(0,300),422);
+   return fail('전송 결과를 확인하지 못했어요. 다시 보내지 말고 29CM 신청내역을 확인해 주세요.',502);
+  }catch(e){return fail((e as Error).message,400)}
+ }
 
  return fail('없는 주소입니다.',404);
 }

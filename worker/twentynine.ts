@@ -32,6 +32,25 @@ async function refresh(cookie:string){
  return {ok:r.ok,status:r.status,cookie:merged.cookie,changed:merged.changed};
 }
 
+// 보관한 세션으로 호출하고, 거절당하면 한 번 갱신한 뒤 다시 시도한다.
+export async function call(db:D1Database,path:string,method='GET',payload?:unknown){
+ let cookie=await memo.get(db,COOKIE)||'';
+ if(!cookie)throw new Error('29CM 연결이 아직 안 돼 있어요.');
+ const send=()=>fetch(API+path,{method,headers:{...jar(cookie),...(payload?{'Content-Type':'application/json'}:{})},
+  body:payload?JSON.stringify(payload):undefined});
+ let r=await send();
+ if(r.status===401||r.status===403){
+  const renewed=await refresh(cookie);
+  if(!renewed.ok)throw new Error('29CM 로그인이 만료됐어요. 연결을 다시 해주세요.');
+  cookie=renewed.cookie;await memo.set(db,COOKIE,cookie);
+  r=await send();
+ }
+ const merged=merge(cookie,r);
+ if(merged.changed)await memo.set(db,COOKIE,merged.cookie);
+ let json:any=null;try{json=await r.json()}catch{}
+ return {status:r.status,json};
+}
+
 async function applications(cookie:string){
  const r=await fetch(API+'/my-applications?page=1&size=100',{headers:jar(cookie)});
  let body:any=null;try{body=await r.json()}catch{}
