@@ -2,16 +2,45 @@ import {valid,token,cookie,matches} from './auth';
 import {list,save,toggle,remove} from './records';
 import {attempts,record,clear} from './throttle';
 import {sync,state} from './twentynine';
+import {directFeed} from '../lib/direct-feed';
+import {memo} from './records';
 
 type Env={DB:D1Database;ASSETS:Fetcher;MOAVIEW_PASSPHRASE:string;SESSION_SECRET:string};
 
 const FEED='https://zueev.github.io/moaview/data/feed.json';
+const FRESH=5400000; // 이보다 오래된 사본은 GitHub 쪽을 대신 쓴다.
+
+// 공고 수집을 여기서 직접 돌린다. GitHub 예약 실행은 몇 시간씩 밀린다.
+async function collect(db:D1Database){
+ const data=await directFeed();
+ if(!data.items.length)throw new Error('수집 결과가 비어 있어요.');
+ // 여기서 막히는 사이트가 있어 GitHub 쪽 사본으로 그 자리만 메운다.
+ let filled=0;
+ try{
+  const backup=await fetch(FEED,{cf:{cacheTtl:300,cacheEverything:true}}).then(r=>r.json()) as typeof data;
+  const theirs=new Map(backup.sources.map(s=>[s.name,s]));
+  const urls=new Set(data.items.map(r=>r.url));
+  for(const source of data.sources){
+   const other=theirs.get(source.name);
+   if(source.status==='ok'||!other||other.status!=='ok')continue;
+   const items=backup.items.filter(r=>r.platform===source.name&&!urls.has(r.url));
+   items.forEach(r=>urls.add(r.url));
+   data.items.push(...items);
+   Object.assign(source,{status:'ok' as const,count:items.length,scope:other.scope+' · 조금 이전 수집분'});
+   filled++;
+  }
+ }catch{}
+ await memo.set(db,'feed',JSON.stringify(data));
+ return {items:data.items.length,sources:data.sources.filter(s=>s.status==='ok').length,filled};
+}
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const fail=(message:string,status=400)=>json({error:message},status);
 
 async function api(request:Request,env:Env,path:string):Promise<Response>{
  // 공고 목록은 로그인 없이도 보이게 둔다. 개인 기록만 잠근다.
  if(path==='/api/feed'){
+  const own=await memo.get(env.DB,'feed');
+  if(own){try{const data=JSON.parse(own);if(Date.now()-data.at<FRESH)return json(data)}catch{}}
   const r=await fetch(FEED,{cf:{cacheTtl:300,cacheEverything:true}});
   return new Response(r.body,{status:r.status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=300'}});
  }
@@ -64,6 +93,9 @@ async function api(request:Request,env:Env,path:string):Promise<Response>{
   return json(await sync(env.DB,cookie));
  }
  if(path==='/api/29cm/sync'&&request.method==='POST')return json(await sync(env.DB));
+ if(path==='/api/collect'&&request.method==='POST'){
+  try{return json(await collect(env.DB))}catch(e){return fail((e as Error).message.slice(0,200),502)}
+ }
  if(path==='/api/29cm/state')return json(await state(env.DB));
 
  return fail('없는 주소입니다.',404);
@@ -76,6 +108,7 @@ export default {
   return env.ASSETS.fetch(request);
  },
  async scheduled(_event:ScheduledController,env:Env,ctx:ExecutionContext){
-  ctx.waitUntil(sync(env.DB).then(r=>console.log('29cm sync',JSON.stringify(r))));
+  ctx.waitUntil(collect(env.DB).then(r=>console.log('collect',JSON.stringify(r)),e=>console.log('collect failed',String(e))));
+  ctx.waitUntil(sync(env.DB).then(r=>console.log('29cm sync',JSON.stringify(r)),e=>console.log('sync failed',String(e))));
  },
 };
