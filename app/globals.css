@@ -372,3 +372,15 @@ body{font-family:'Pretendard','Malgun Gothic',Arial,sans-serif;background:#fafaf
  .catalog-search input{min-width:0}
  table,pre{max-width:100%;overflow-x:auto;display:block}
 }
+
+/* 가로로 흔들리는 것까지 막는다. clip은 스크롤 컨테이너를 만들지 않아 hidden보다 확실하다. */
+@media (max-width:640px){
+ html,body{overflow-x:clip;overscroll-behavior-x:none;touch-action:pan-y}
+ .shell,.workspace,.main-column,.feed{overflow-x:clip}
+ /* 탭 줄 안에서의 좌우 스크롤이 페이지로 번지지 않게 */
+ .nav-tabs,.kind-tabs,.platform-tabs,.category-tabs,.status-tabs,.apply-filter{overscroll-behavior-x:contain}
+ /* 화면을 넘길 만큼 넓어질 수 있는 것들 */
+ .top,.intro,.stats,.message,.connection-details,.catalog-heading,.catalog-controls,
+ .catalog-search,.filters,.record-list,.catalog-grid,.section-heading{max-width:100%;min-width:0}
+ input,textarea,select,button{max-width:100%}
+}
