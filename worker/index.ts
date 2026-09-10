@@ -4,7 +4,7 @@ import {attempts,record,clear} from './throttle';
 import {sync,state,call} from './twentynine';
 import {body as applyBody,summary,open as openForApply} from './apply';
 import {directFeed} from '../lib/direct-feed';
-import {collect as revuCollect,state as revuState} from './revu';
+import {collect as revuCollect,state as revuState,applications as revuApplications} from './revu';
 import {memo} from './records';
 
 type Env={DB:D1Database;ASSETS:Fetcher;MOAVIEW_PASSPHRASE:string;SESSION_SECRET:string};
@@ -110,6 +110,7 @@ async function api(request:Request,env:Env,path:string):Promise<Response>{
  if(path==='/api/29cm/state')return json(await state(env.DB));
 
  if(path==='/api/revu/state')return json(await revuState(env.DB));
+ if(path==='/api/revu/sync'&&request.method==='POST')return json(await revuApplications(env.DB));
  if(path==='/api/revu/connect'&&request.method==='POST'){
   const asked=await request.json().catch(()=>({})) as {token?:unknown};
   const raw=typeof asked.token==='string'?asked.token.trim().replace(/^Bearer\s+/i,''):'';
@@ -163,5 +164,6 @@ export default {
  async scheduled(_event:ScheduledController,env:Env,ctx:ExecutionContext){
   ctx.waitUntil(collect(env.DB).then(r=>console.log('collect',JSON.stringify(r)),e=>console.log('collect failed',String(e))));
   ctx.waitUntil(sync(env.DB).then(r=>console.log('29cm sync',JSON.stringify(r)),e=>console.log('sync failed',String(e))));
+  ctx.waitUntil(revuApplications(env.DB).then(r=>console.log('revu apps',JSON.stringify(r)),e=>console.log('revu apps failed',String(e))));
  },
 };

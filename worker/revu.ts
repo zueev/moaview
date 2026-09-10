@@ -87,6 +87,42 @@ export async function collect(db:D1Database,seed?:string):Promise<{items:DirectL
  }
 }
 
+// 토큰 안에 사용자 번호가 들어 있어 따로 물어볼 필요가 없다.
+function userId(token:string){
+ try{
+  const body=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  const parsed=JSON.parse(atob(body+'==='.slice((body.length+3)%4))) as {id?:unknown;sub?:unknown};
+  const id=Number(parsed.id??parsed.sub);
+  return Number.isFinite(id)&&id>0?id:null;
+ }catch{return null}
+}
+
+// 레뷰에 신청한 공고를 내 기록으로 옮긴다. 당첨 여부는 목록에 없어 손대지 않는다.
+export async function applications(db:D1Database):Promise<{found:number;added:number;message?:string}>{
+ const token=await memo.get(db,KEY);
+ if(!token)return {found:0,added:0,message:'레뷰 연결 정보가 아직 없어요.'};
+ const id=userId(token);
+ if(!id)return {found:0,added:0,message:'레뷰 토큰을 읽지 못했어요.'};
+ const r=await fetch(`${API}/users/${id}/campaigns?limit=100&page=1`,{headers:head(token)});
+ if(!r.ok)return {found:0,added:0,message:'레뷰 신청내역을 불러오지 못했어요.'};
+ const rows=((await r.json()) as {items?:Row[]}).items||[];
+ let added=0;
+ for(const x of rows){
+  const campaign=Number(x.id);
+  if(!Number.isFinite(campaign))continue;
+  const url='https://www.revu.net/campaign/'+campaign;
+  const existing=await db.prepare('SELECT id FROM campaigns WHERE url=?').bind(url).first<{id:string}>();
+  if(existing)continue;
+  const now=new Date().toISOString();
+  const kind=(x.category||[]).includes('방문형')?'방문형':'배송형';
+  await db.prepare(`INSERT INTO campaigns (id,title,platform,url,kind,status,due,notes,tasks,source,created,updated)
+    VALUES (?,?,'레뷰',?,?,'신청 완료','','','[]','revu',?,?)`)
+   .bind(crypto.randomUUID(),String(x.item||'레뷰 체험단').slice(0,150),url,kind,now,now).run();
+  added++;
+ }
+ return {found:rows.length,added};
+}
+
 export async function state(db:D1Database){
  return {connected:!!await memo.get(db,KEY),last:JSON.parse(await memo.get(db,SEEN)||'null')};
 }
