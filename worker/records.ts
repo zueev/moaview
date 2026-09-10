@@ -1,6 +1,6 @@
 import {statuses,platforms,type Campaign,type Task} from '../lib/model';
 
-type Row={id:string;title:string;platform:string;url:string;kind:string;status:string;due:string;notes:string;tasks:string;created:string};
+type Row={id:string;title:string;platform:string;url:string;kind:string;status:string;due:string;notes:string;tasks:string;created:string;announce?:string};
 const toCampaign=(r:Row):Campaign=>({...r,tasks:JSON.parse(r.tasks)});
 
 export function checklist(kind:string):Task[]{
@@ -9,7 +9,7 @@ export function checklist(kind:string):Task[]{
 }
 
 export async function list(db:D1Database):Promise<Campaign[]>{
- const r=await db.prepare('SELECT id,title,platform,url,kind,status,due,notes,tasks,created FROM campaigns ORDER BY created DESC').all<Row>();
+ const r=await db.prepare('SELECT id,title,platform,url,kind,status,due,notes,tasks,created,announce FROM campaigns ORDER BY created DESC').all<Row>();
  return r.results.map(toCampaign);
 }
 

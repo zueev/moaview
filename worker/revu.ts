@@ -11,7 +11,7 @@ const SEOUL=/^(서울|강남|강동|강북|강서|관악|광진|구로|금천|�
 const head=(token:string)=>({Accept:'application/json',Authorization:'Bearer '+token,
  Origin:'https://www.revu.net',Referer:'https://www.revu.net/','User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0'});
 
-type Row={item?:string;media?:string;byDeadline?:number;requestEndedOn?:string;reviewerLimit?:number;id?:number;
+type Row={item?:string;entryAnnouncedOn?:string;media?:string;byDeadline?:number;requestEndedOn?:string;reviewerLimit?:number;id?:number;
  thumbnail?:string;category?:string[];localTag?:string[];status?:string;active?:boolean;
  campaignStats?:{requestCount?:number}};
 
@@ -111,13 +111,18 @@ export async function applications(db:D1Database):Promise<{found:number;added:nu
   const campaign=Number(x.id);
   if(!Number.isFinite(campaign))continue;
   const url='https://www.revu.net/campaign/'+campaign;
-  const existing=await db.prepare('SELECT id FROM campaigns WHERE url=?').bind(url).first<{id:string}>();
-  if(existing)continue;
+  const announce=String(x.entryAnnouncedOn||'');
+  const existing=await db.prepare('SELECT id,announce FROM campaigns WHERE url=?').bind(url).first<{id:string;announce:string}>();
+  if(existing){
+   // 발표일 칸이 나중에 생겨서, 비어 있는 기존 기록만 채워 준다.
+   if(announce&&!existing.announce)await db.prepare('UPDATE campaigns SET announce=? WHERE id=?').bind(announce,existing.id).run();
+   continue;
+  }
   const now=new Date().toISOString();
   const kind=(x.category||[]).includes('방문형')?'방문형':'배송형';
-  await db.prepare(`INSERT INTO campaigns (id,title,platform,url,kind,status,due,notes,tasks,source,created,updated)
-    VALUES (?,?,'레뷰',?,?,'신청 완료','','','[]','revu',?,?)`)
-   .bind(crypto.randomUUID(),String(x.item||'레뷰 체험단').slice(0,150),url,kind,now,now).run();
+  await db.prepare(`INSERT INTO campaigns (id,title,platform,url,kind,status,due,notes,tasks,announce,source,created,updated)
+    VALUES (?,?,'레뷰',?,?,'신청 완료','','','[]',?,'revu',?,?)`)
+   .bind(crypto.randomUUID(),String(x.item||'레뷰 체험단').slice(0,150),url,kind,announce,now,now).run();
   added++;
  }
  return {found:rows.length,added};

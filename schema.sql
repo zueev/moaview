@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
   due     TEXT NOT NULL,
   notes   TEXT NOT NULL,
   tasks   TEXT NOT NULL,
+  announce TEXT NOT NULL DEFAULT '',   -- 선정 발표 예정일
   source  TEXT NOT NULL DEFAULT 'manual',
   created TEXT NOT NULL,
   updated TEXT NOT NULL
