@@ -4,6 +4,7 @@ import {attempts,record,clear} from './throttle';
 import {sync,state,call} from './twentynine';
 import {body as applyBody,summary,open as openForApply} from './apply';
 import {directFeed} from '../lib/direct-feed';
+import {collect as revuCollect,state as revuState} from './revu';
 import {memo} from './records';
 
 type Env={DB:D1Database;ASSETS:Fetcher;MOAVIEW_PASSPHRASE:string;SESSION_SECRET:string};
@@ -31,8 +32,17 @@ async function collect(db:D1Database){
    filled++;
   }
  }catch{}
+ // 레뷰는 토큰이 필요해 여기(D1이 있는 쪽)에서 따로 가져와 합친다.
+ const revu=await revuCollect(db);
+ if(revu.items.length){
+  const urls=new Set(data.items.map(r=>r.url));
+  data.items.push(...revu.items.filter(r=>!urls.has(r.url)));
+ }
+ if(revu.result.ok||revu.result.message!=='레뷰 연결 정보가 아직 없어요.')
+  data.sources.push({name:'레뷰',url:'https://www.revu.net/',status:revu.result.ok?'ok':'error',
+   count:revu.items.length,scope:revu.result.ok?'블로그 공고 최근 200건':(revu.result.message||'현재 불러오지 못함')});
  await memo.set(db,'feed',JSON.stringify(data));
- return {items:data.items.length,sources:data.sources.filter(s=>s.status==='ok').length,filled};
+ return {items:data.items.length,sources:data.sources.filter(s=>s.status==='ok').length,filled,레뷰:revu.result};
 }
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const fail=(message:string,status=400)=>json({error:message},status);
@@ -98,6 +108,15 @@ async function api(request:Request,env:Env,path:string):Promise<Response>{
   try{return json(await collect(env.DB))}catch(e){return fail((e as Error).message.slice(0,200),502)}
  }
  if(path==='/api/29cm/state')return json(await state(env.DB));
+
+ if(path==='/api/revu/state')return json(await revuState(env.DB));
+ if(path==='/api/revu/connect'&&request.method==='POST'){
+  const asked=await request.json().catch(()=>({})) as {token?:unknown};
+  const raw=typeof asked.token==='string'?asked.token.trim().replace(/^Bearer\s+/i,''):'';
+  if(raw.length<20)return fail('레뷰 토큰을 확인해 주세요.');
+  const tried=await revuCollect(env.DB,raw);
+  return json(tried.result);
+ }
 
  // 배송지는 저장해두지 않는다. 신청할 때마다 화면에서 직접 넣는다.
  const event=path.match(/^\/api\/29cm\/event\/(PE_[A-Za-z0-9]+)$/);
