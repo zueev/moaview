@@ -315,12 +315,23 @@ body{font-family:'Pretendard','Malgun Gothic',Arial,sans-serif;background:#fafaf
  .experience-body h3{font-size:14px;line-height:1.35;max-height:2.7em;overflow:hidden;margin:0 0 4px}
  .experience-benefit{font-size:12px;line-height:1.4;max-height:2.8em;overflow:hidden;margin:0 0 6px}
  .experience-details{display:none}
- .experience-bottom{margin:0;padding:0;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;border:0}
- .experience-bottom .campaign-destination{display:flex;gap:8px;align-items:center}
- .experience-bottom a{font-size:12px}
- .inline-apply{padding:.3rem .6rem;font-size:12px}
+ .experience-bottom{margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;font-size:12px;border:0;min-width:0}
+ .experience-bottom>span{min-width:0}
+ .experience-bottom .campaign-destination{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0;justify-content:flex-end}
+ .experience-bottom a{font-size:12px;white-space:nowrap}
+ .inline-apply{padding:.3rem .6rem;font-size:12px;white-space:nowrap}
  .record-applied{margin-top:6px;padding:6px 0;font-size:12px;width:100%}
+ .experience-body h3,.experience-benefit{overflow-wrap:anywhere}
+ /* 신청 창도 좁은 화면에선 한 줄씩 */
+ .apply-address{grid-template-columns:1fr}
+ .connect-29cm,.direct-apply{max-width:100%}
 }
+/* 카드 안의 것이 카드를 넘지 않게 공통으로 막아 둔다. */
+.experience-card,.record,.task-card{overflow:hidden}
+.experience-card *,.record *,.task-card *{box-sizing:border-box;max-width:100%}
+.experience-details p{overflow-wrap:anywhere}
+.status-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.status-tabs button{white-space:nowrap;flex:0 0 auto}
 .direct-apply{display:grid;gap:.75rem;max-width:34rem;max-height:85vh;overflow-y:auto}
 .apply-form{display:grid;gap:.75rem}
 .apply-caption{font-size:.82rem;opacity:.7;margin:0}

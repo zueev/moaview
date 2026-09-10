@@ -8,19 +8,16 @@ import type {Listing} from '@/lib/feed-parser';
 type Option={id:number;name:string};
 type Detail={eventKey:string;name:string;brand:string;partner:string;endAt:string;reviewEndAt:string;applied:boolean;optionRequired:boolean;options:Option[]};
 
-const FIELDS=[['receiverName','수령인','이름',60],['receiverPhone','휴대폰 번호','010-0000-0000',13],
- ['receiverZipcode','우편번호','5자리',5],['receiverAddress','주소','도로명 주소',200],
- ['receiverDetailAddress','상세주소','동·호수 등',150],['etcMessage','배송 요청 사항','선택 입력',100]] as const;
-const OPTIONAL=['receiverDetailAddress','etcMessage'];
-const blank=Object.fromEntries(FIELDS.map(([k])=>[k,'']));
+import {FIELDS,OPTIONAL,blankAddress,loadAddress,saveAddress,AddressFields} from './address';
 const day=(v:string)=>v?new Date(v).toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric'}):'—';
 
 export default function Apply29CM({listing,onClose,onDone}:{listing:Listing;onClose:()=>void;onDone:()=>void}){
  const key=new URL(listing.url).pathname.split('/').pop()||'';
  const [detail,setDetail]=useState<Detail>(),[error,setError]=useState(''),[busy,setBusy]=useState(false),[sent,setSent]=useState('');
- const [option,setOption]=useState(''),[address,setAddress]=useState<Record<string,string>>(blank);
+ const [option,setOption]=useState(''),[address,setAddress]=useState<Record<string,string>>(blankAddress());
  const [agree,setAgree]=useState([false,false,false,false]),[confirmed,setConfirmed]=useState(false);
 
+ useEffect(()=>{void loadAddress().then(a=>{if(a)setAddress(a)})},[]);
  useEffect(()=>{void (async()=>{
   try{
    const r=await fetch('/api/29cm/event/'+key,{credentials:'same-origin'});
@@ -42,6 +39,7 @@ export default function Apply29CM({listing,onClose,onDone}:{listing:Listing;onCl
    const body=await r.json();
    if(!r.ok)throw new Error(body?.error||'신청하지 못했어요.');
    setSent(body.name||listing.name);
+   void saveAddress(address);
    onDone();
   }catch(e){setError(e instanceof Error?e.message:'신청하지 못했어요.')}
   finally{setBusy(false)}
@@ -64,12 +62,8 @@ export default function Apply29CM({listing,onClose,onDone}:{listing:Listing;onCl
      <SelectContent>{detail.options.map(o=><SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>)}</SelectContent>
     </Select></label>}
 
-   <div className="apply-address">{FIELDS.map(([k,label,placeholder,max])=>
-    <label key={k}>{label}
-     <input required={!OPTIONAL.includes(k)} autoComplete="off" maxLength={max} placeholder={placeholder}
-      value={address[k]} onChange={e=>setAddress({...address,[k]:e.target.value})}/>
-    </label>)}</div>
-   <p className="apply-note">배송지는 저장하지 않아요. 신청할 때마다 넣어 주세요.</p>
+   <AddressFields value={address} onChange={setAddress}/>
+   <p className="apply-note">저장해둔 배송지예요. 여기서 고치면 다음 신청에도 그대로 쓰여요.</p>
 
    <div className="apply-terms">
     <a href={listing.url} target="_blank" rel="noopener noreferrer">29CM 원문 유의사항·약관 확인 ↗</a>

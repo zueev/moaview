@@ -119,7 +119,19 @@ async function api(request:Request,env:Env,path:string):Promise<Response>{
   return json(tried.result);
  }
 
- // 배송지는 저장해두지 않는다. 신청할 때마다 화면에서 직접 넣는다.
+ // 배송지는 한 번 넣어두고 신청할 때마다 채워 쓴다.
+ if(path==='/api/address'){
+  if(request.method==='GET')return json(JSON.parse(await memo.get(env.DB,'address')||'null'));
+  if(request.method==='POST'){
+   const asked=await request.json().catch(()=>null) as Record<string,unknown>|null;
+   if(!asked||typeof asked!=='object')return fail('배송지를 확인해 주세요.');
+   const fields=['receiverName','receiverPhone','receiverZipcode','receiverAddress','receiverDetailAddress','etcMessage'];
+   const kept=Object.fromEntries(fields.map(k=>[k,String(asked[k]??'').slice(0,200)]));
+   await memo.set(env.DB,'address',JSON.stringify(kept));
+   return json({ok:true});
+  }
+ }
+
  const event=path.match(/^\/api\/29cm\/event\/(PE_[A-Za-z0-9]+)$/);
  if(event&&request.method==='GET'){
   try{
