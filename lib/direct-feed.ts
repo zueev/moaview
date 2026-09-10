@@ -16,20 +16,58 @@ export function reviewnote(html:string):DirectListing[]{const match=html.match(/
 export function mible(html:string):DirectListing[]{return [...html.matchAll(/<a href="([^"]+)" class="campaign_item">([\s\S]*?)<\/a>/g)].flatMap(m=>{const s=m[2];if(!/sns_icon blog/.test(s))return [];const region=get(s,/class="area">([\s\S]*?)<\/span>\s*<strong/);const r=entry('미블',m[1],get(s,/class="subject">([\s\S]*?)<\/strong>/),region,get(s,/class="desc">([\s\S]*?)<\/p>/),get(s,/class="d_day">([\s\S]*?)<\/span>/),get(s,/<img src="([^"]+)"/),Number(get(s,/신청\s*<strong>(\d+)/)),Number(get(s,/모집\s*(\d+)/)),region.includes('배송'));return r?[r]:[]});}
 export function play(html:string):DirectListing[]{return [...html.matchAll(/<li>([\s\S]*?)<\/li>/g)].flatMap(m=>{const s=m[1];if(!/class="blog"/.test(s))return [];const path=get(s,/href="(item.php\?it_id=[^"]+)"/);if(!path)return [];const title=get(s,/class="it_name">([\s\S]*?)<\/span>/);const region=title.match(/^\[([^\]]+)\]/)?.[1]||'';const image=get(s,/<img src="([^"]+)"[^>]*class="it_img"/);const r=entry('놀러와체험단',new URL(path,'https://cometoplay.kr/').href,title,region,get(s,/class="it_description">([\s\S]*?)<\/span>/),get(s,/class="txt_num">(D-day\s*\d+)/),image?new URL(image,'https://cometoplay.kr/').href:'',Number(get(s,/신청\s*<b[^>]*>(\d+)/)),Number(get(s,/모집\s*<b[^>]*>(\d+)/)),/배송|쇼핑몰/.test(region));return r?[r]:[]});}
 export function ouba(html:string):DirectListing[]{return html.split('<li class="campaign_content">').slice(1).flatMap(block=>{const s=block.split('</li>')[0];if(!/thum_ch_blog/.test(s))return [];const title=get(s,/class="s_campaign_title">([\s\S]*?)<\/strong>/);const region=title.match(/^\[([^\]]+)\]/)?.[1]||'';const r=entry('서울오빠',get(s,/href="([^"]+)"[^>]*class="tum_img"/),title,region,get(s,/class="basic_blue">([\s\S]*?)<\/span>/),get(s,/class="d_day"><span>([\s\S]*?)<\/span>/),get(s,/<img src="([^"]+)"/),Number(get(s,/신청\s*(\d+)/)),Number(get(s,/모집\s*(\d+)/)),region.includes('배송'));return r?[r]:[]});}
-type Provider={name:string;url:string;parse:(s:string)=>DirectListing[];scope:string;extras?:{url:string;category?:Category}[]};
+// parse는 받아온 문서를 읽고, load는 여러 번 호출해야 하는 곳이 직접 가져온다.
+type Provider={name:string;url:string;scope:string;parse?:(s:string)=>DirectListing[];load?:()=>Promise<DirectListing[]>;extras?:{url:string;category?:Category}[]};
 // 강남맛집은 파서가 동작하지만 GitHub Actions의 해외 IP를 막아 목록에서 제외했다.
 const API29='https://preuser-api.29cm.co.kr/api/v4/preuser/events';
-const providers:Provider[]=[{name:'29CM',url:API29+'?page=1&size=100',parse:twentynine,scope:'모집 중인 29CM 체험단 전체',extras:[{url:API29+'?page=2&size=100'}]}, {name:'리뷰플레이스',url:'https://www.reviewplace.co.kr/',parse:reviewplace,scope:'홈 공개 모집 공고'}, {name:'스토리앤미디어',url:'https://www.storyn.kr/review_campaign_list.php',parse:storyn,scope:'공개 모집 목록'}, {name:'아싸뷰',url:'https://assaview.co.kr/',parse:assa,scope:'홈 공개 모집 공고'}, {name:'리뷰노트',url:'https://www.reviewnote.co.kr/campaigns',parse:reviewnote,scope:'공개 목록에 제공되는 공고'}, {name:'미블',url:'https://www.mrblog.net/',parse:mible,scope:'홈 공개 공고 · 전체 목록은 로그인 필요'}, {name:'놀러와체험단',url:'https://cometoplay.kr/index.php',parse:play,scope:'홈 공개 모집 공고'}, {name:'서울오빠',url:'https://www.seoulouba.co.kr/campaign/',parse:ouba,scope:'공개 모집 목록 첫 페이지'}];
+const providers:Provider[]=[
+ {name:'29CM',url:API29+'?page=1&size=100',parse:twentynine,scope:'모집 중인 29CM 체험단 전체',extras:[{url:API29+'?page=2&size=100'}]},
+ {name:'포포몬',url:'https://popomon.com/next/campaign',load:popomon,scope:'블로그 공고 최근 120건'},
+];
 let cached:{at:number;items:DirectListing[];sources:SourceState[]}|undefined;
 export async function directFeed(){
  if(cached&&Date.now()-cached.at<300000)return cached;
  const results=await Promise.all(providers.map(async p=>{
-  const pages=await Promise.allSettled([{url:p.url,category:undefined as Category|undefined},...(p.extras||[])].map(async page=>{const r=await fetch(page.url,{signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error();const html=await r.text();const items=p.parse(html);return page.category?items.map(item=>({...item,category:page.category!,categoryOrigin:'source' as const})):items;}));
+  const pages=p.load?await Promise.allSettled([p.load()])
+   :await Promise.allSettled([{url:p.url,category:undefined as Category|undefined},...(p.extras||[])].map(async page=>{const r=await fetch(page.url,{signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error();const html=await r.text();const items=p.parse!(html);return page.category?items.map(item=>({...item,category:page.category!,categoryOrigin:'source' as const})):items;}));
   const successes=pages.filter((r):r is PromiseFulfilledResult<DirectListing[]>=>r.status==='fulfilled');const items=[...new Map(successes.flatMap(r=>r.value).map(r=>[r.url,r])).values()];const failed=pages.length-successes.length;
   return {items,source:{name:p.name,url:p.url,status:successes.length?'ok' as const:'error' as const,count:items.length,scope:successes.length?p.scope+(failed?' · 일부 목록 조회 실패':''):'현재 불러오지 못함 · 재시도 필요'}};
  }));
  const items=[...new Map(results.flatMap(r=>r.items).map(r=>[r.url,r])).values()];cached={at:Date.now(),items,sources:[...results.map(r=>r.source)]};return cached;
 }
+// 포포몬은 목록을 POST로만 내려준다. 한 번에 12건이라 최근 몇 페이지만 훑는다.
+const POPO='https://popomon.com/api_p/campaign/fetch_getcampaignlist';
+type PopoRow={C_idx?:string;C_title?:string;C_provision?:string;C_state?:string;C_recruit_type?:string;
+ C_regi_end_date?:string;C_choice_count?:string;C_volunteer_count?:string;thumb_img?:string;C_thumb_img_path?:string};
+
+export async function popomon():Promise<DirectListing[]>{
+ const offsets=[0,12,24,36,48,60,72,84,96,108];
+ const pages=await Promise.all(offsets.map(async n=>{
+  const q=`searchAlign=latest&bigRecruitType=Ldelivery&recruitType=delivery&interestsFilter=ALL&pageNum=${n}&snsSubFilter=blog`;
+  const r=await fetch(POPO+'?'+q,{method:'POST',headers:{'Referer':'https://popomon.com/next/campaign'},signal:AbortSignal.timeout(12000)});
+  if(!r.ok)throw Error();
+  const body=await r.json() as {data?:{contentsData?:PopoRow[]}};
+  return body?.data?.contentsData||[];
+ }));
+ const seen=new Set<string>();
+ return pages.flat().flatMap(x=>{
+  const id=String(x.C_idx||'');
+  if(!/^\d+$/.test(id)||seen.has(id)||x.C_state!=='ONGOING')return [];
+  const kind=x.C_recruit_type;
+  if(kind!=='shipping'&&kind!=='visiting')return [];      // 기자단은 제품 제공이 없어 제외한다.
+  const end=Date.parse(String(x.C_regi_end_date||'')+'T23:59:59+09:00');
+  if(!Number.isFinite(end)||end<=Date.now())return [];
+  seen.add(id);
+  const title=text(x.C_title);
+  const region=title.match(/^\[([^\]]+)\]/)?.[1]||'';
+  const image=text(x.thumb_img||x.C_thumb_img_path);
+  const r=entry('포포몬','https://popomon.com/next/campaign/'+id,title,region,text(x.C_provision),
+   'D-'+Math.max(0,Math.ceil((end-Date.now())/86400000)),/^https?:\/\//.test(image)?image:'',
+   Number(x.C_volunteer_count)||0,Number(x.C_choice_count)||0,kind==='shipping');
+  return r?[{...r,endAt:new Date(end).toISOString()}]:[];
+ });
+}
+
 export function gangnam(html:string):DirectListing[]{return [...html.matchAll(/<li class='list_item[^']*'[^>]*>([\s\S]*?)<\/li>/g)].flatMap(m=>{const s=m[1];if(!/class='blog'/.test(s))return [];const title=get(s,/class='tit'><a[^>]*>([\s\S]*?)<\/a>/);const path=get(s,/href='([^']+)'/);const region=title.match(/^\[([^\]]+)\]/)?.[1]||'';const image=get(s,/<img src='([^']+)'/);const flat=text(s);const r=entry('강남맛집',new URL(path,'https://xn--939au0g4vj8sq.net/').href,title,region,get(s,/class='sub_tit'>([\s\S]*?)<\/dd>/),get(s,/class='day_c'>([\s\S]*?)<\/em>/),image?new URL(image,'https://xn--939au0g4vj8sq.net/').href:'',Number(flat.match(/신청\s*([\d,]+)/)?.[1].replaceAll(',','')||0),Number(flat.match(/모집\s*([\d,]+)/)?.[1].replaceAll(',','')||0),/class='type'>배송형/.test(s));if(r&&/페이백/.test(title))r.conditions='페이백 공고 · 구매 비용과 환급 조건을 원문에서 확인해 주세요.';return r?[r]:[]});}
 export function assa(html:string):DirectListing[]{return [...html.matchAll(/<a href="(campaign.php\?cp_id=[^"]+)">([\s\S]*?)<\/a>/g)].flatMap(m=>{const s=m[2];if(!/blog_icon/.test(s))return [];const title=get(s,/class="subject">([\s\S]*?)<\/div>/);const region=title.match(/^\[([^\]]+)\]/)?.[1]||'';const until=get(s,/data-countdown\d?="([^"]+)"/);if(!until)return [];const end=until.replaceAll('/','-').replace(' ','T')+'+09:00';if(Date.parse(end)<Date.now())return [];const days=Math.ceil((Date.parse(end)-Date.now())/86400000);const image=get(s,/<img src="([^"]+)"/);const flat=text(s);const delivery=/배송형|구매형/.test(get(s,/class="cp_type">([\s\S]*?)<\/div>/));const r=entry('아싸뷰',new URL(m[1],'https://assaview.co.kr/').href,title,region,get(s,/class="opt_name">([\s\S]*?)<\/span>/),`D-${days}`,image?new URL(image,'https://assaview.co.kr/').href:'',Number(flat.match(/신청\s*(\d+)/)?.[1]||0),Number(flat.match(/\/\s*(\d+)명/)?.[1]||0),delivery);if(r){r.endAt=end;if(/구매형/.test(s))r.conditions='구매형 공고 · 선결제 금액과 환급 조건을 원문에서 확인해 주세요.';}return r?[r]:[]});}
 
