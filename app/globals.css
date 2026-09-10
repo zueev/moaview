@@ -348,3 +348,27 @@ body{font-family:'Pretendard','Malgun Gothic',Arial,sans-serif;background:#fafaf
 .apply-success{display:grid;gap:.7rem}
 .direct-apply .primary{padding:.7rem;border:0;border-radius:.6rem;background:#111;color:#fff;font-weight:600;cursor:pointer}
 .direct-apply .primary:disabled{opacity:.4;cursor:default}
+
+/* 좁은 화면에서 가로로 밀리는 것을 마지막에 한 번에 막는다. */
+@media (max-width:640px){
+ html,body{overflow-x:hidden;max-width:100%}
+ .shell,.workspace,.main-column,.feed,.side-column{max-width:100%;min-width:0}
+ .workspace{grid-template-columns:1fr!important;gap:16px}
+ .side-column{width:auto}
+ .stats{grid-template-columns:repeat(2,1fr)!important}
+ .discovery-grid,.listing-grid,.catalog-grid,.connections-grid{grid-template-columns:1fr!important}
+ .intro-row{flex-direction:column;align-items:flex-start;gap:12px}
+ .intro-row h1{font-size:24px}
+ .top{flex-wrap:wrap;gap:8px}
+ .top-right{flex-wrap:wrap;gap:8px}
+ .filters{flex-wrap:wrap}
+ /* 탭 줄은 잘리지 않게 그 안에서만 옆으로 넘긴다 */
+ .nav-tabs,.kind-tabs,.platform-tabs,.category-tabs,.status-tabs,.apply-filter{
+  overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;max-width:100%}
+ .nav-tabs::-webkit-scrollbar,.kind-tabs::-webkit-scrollbar,.platform-tabs::-webkit-scrollbar,
+ .category-tabs::-webkit-scrollbar,.status-tabs::-webkit-scrollbar,.apply-filter::-webkit-scrollbar{display:none}
+ .nav-tabs>*,.kind-tabs>*,.platform-tabs>*,.category-tabs>*,.status-tabs>*,.apply-filter>*{
+  flex:0 0 auto;white-space:nowrap}
+ .catalog-search input{min-width:0}
+ table,pre{max-width:100%;overflow-x:auto;display:block}
+}
